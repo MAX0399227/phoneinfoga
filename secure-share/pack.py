@@ -36,7 +36,7 @@ try:
 except ImportError as e:
     sys.exit(f"Falta una dependencia: {e}. Instala con: pip install -r requirements.txt")
 
-TTL_SECONDS = 210          # 3 min 30 s
+TTL_SECONDS = 75           # 1 min 15 s
 RENDER_DPI = 150
 
 

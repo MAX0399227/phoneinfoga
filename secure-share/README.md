@@ -1,7 +1,7 @@
 # secure-share — Compartir documentos cifrados y autodestructibles
 
 Herramienta para empaquetar un PDF confidencial en un **ZIP cifrado AES‑256**
-con un **visor autodestructible** (3 min 30 s) y trazabilidad por **código
+con un **visor autodestructible** (1 min 15 s) y trazabilidad por **código
 numérico invisible** + marca de agua.
 
 ## Qué hace (garantizado de verdad)
@@ -10,7 +10,7 @@ numérico invisible** + marca de agua.
 - **Código numérico invisible** asignado al título: se incrusta en los
   metadatos del documento y mediante esteganografía de caracteres de ancho
   cero. Permite identificar el origen de una fuga.
-- **Autodestrucción a los 210 s** (3:30): el visor se cierra solo y libera el
+- **Autodestrucción a los 75 s** (1:15): el visor se cierra solo y libera el
   contenido de memoria. El contenido se descifra **solo en RAM**, nunca se
   escribe en disco.
 - **Sin texto copiable**: las páginas se rasterizan a imagen; no hay texto
@@ -56,7 +56,7 @@ Abrir (lado receptor):
 
 ```bash
 python viewer.py documento.secure.zip
-# Pide la clave, muestra el documento 3:30 y se cierra solo.
+# Pide la clave, muestra el documento 1:15 y se cierra solo.
 ```
 
 Comparte el `documento.secure.zip` y el `viewer.py` por un canal, y **la clave

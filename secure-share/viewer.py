@@ -4,7 +4,7 @@ viewer.py — Visor seguro y AUTODESTRUCTIBLE para paquetes generados con pack.p
 
 Comportamiento:
   * Pide la clave, descifra el contenido EN MEMORIA (nunca lo escribe en disco).
-  * Muestra el documento a pantalla completa durante 3 min 30 s (210 s) y se
+  * Muestra el documento a pantalla completa durante 1 min 15 s (75 s) y se
     cierra solo. Una barra muestra el tiempo restante.
   * Modo anti-pantallazo (BEST-EFFORT, no infalible):
       - Al perder el foco la ventana (típico al lanzar una herramienta de
