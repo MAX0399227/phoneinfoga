@@ -71,25 +71,31 @@ def digitize(text: str, code: str) -> str:
     return "".join(out)
 
 
-def hide_titles(doc, code):
-    """Redacta los títulos/encabezados y los sustituye por su versión numérica."""
+def hide_text(doc, code, scope="titles"):
+    """Redacta texto y lo sustituye por su versión numérica.
+
+    scope="titles" -> solo encabezados/títulos (fuente grande).
+    scope="all"    -> TODO el texto del documento queda en números."""
     n_hidden = 0
     for page in doc:
         spans = []
         for b in page.get_text("dict")["blocks"]:
             for l in b.get("lines", []):
                 for s in l["spans"]:
-                    if s["size"] >= HEAD_MIN_SIZE and s["text"].strip():
+                    if not s["text"].strip():
+                        continue
+                    if scope == "all" or s["size"] >= HEAD_MIN_SIZE:
                         spans.append((fitz.Rect(s["bbox"]), s["text"], s["size"]))
         for rect, _txt, _sz in spans:
-            page.add_redact_annot(rect, fill=(1, 1, 1))  # blanquea el título
+            page.add_redact_annot(rect, fill=(1, 1, 1))  # blanquea el texto
         if spans:
-            page.apply_redactions()
+            # graphics=0: no borrar líneas/bordes de tabla, solo el texto
+            page.apply_redactions(images=0, graphics=0)
         for rect, txt, sz in spans:
             digits = digitize(txt, code)
             box = fitz.Rect(rect.x0, rect.y0 - 1, rect.x1, rect.y1 + sz * 0.5)
             fs = sz
-            while fs > 4:
+            while fs > 3:
                 rc = page.insert_textbox(box, digits, fontsize=fs,
                                          fontname="cour", color=(0, 0, 0))
                 if rc >= 0:
@@ -162,8 +168,10 @@ def main():
     ap.add_argument("-o", "--out", help="ZIP de salida", default=None)
     ap.add_argument("-r", "--recipient", default=None,
                     help="Nombre/ID del destinatario (marca de agua individual)")
+    ap.add_argument("--hide", choices=["none", "titles", "all"], default="titles",
+                    help="Qué ocultar como números: none / titles / all (todo el texto)")
     ap.add_argument("--no-hide-title", action="store_true",
-                    help="No ocultar los títulos como números")
+                    help="Atajo de --hide none")
     args = ap.parse_args()
 
     if not os.path.isfile(args.pdf):
@@ -188,9 +196,11 @@ def main():
 
     print(f"[*] Código numérico invisible del título: {code}")
 
-    if not args.no_hide_title:
-        n = hide_titles(doc, code)
-        print(f"[*] Títulos ocultados como números: {n}")
+    hide = "none" if args.no_hide_title else args.hide
+    if hide != "none":
+        n = hide_text(doc, code, scope=hide)
+        que = "todo el texto" if hide == "all" else "títulos"
+        print(f"[*] Ocultado como números ({que}): {n} fragmentos")
 
     rtag = recipient_tag(args.recipient) if args.recipient else None
     if args.recipient:
@@ -207,7 +217,7 @@ def main():
         "title_invisible": code,
         "recipient": args.recipient,
         "recipient_tag": rtag,
-        "titles_hidden_as_numbers": not args.no_hide_title,
+        "hide_mode": hide,
         "pages": doc.page_count,
         "ttl_seconds": TTL_SECONDS,
         "created": int(time.time()),
@@ -215,12 +225,13 @@ def main():
         "note": f"Autodestruccion a los {TTL_SECONDS}s. No reenviar.",
     }
 
-    base = os.path.splitext(args.pdf)[0]
+    # El nombre del archivo es NUMÉRICO (no revela el título del documento).
+    out_dir = os.path.dirname(os.path.abspath(args.pdf))
     if args.recipient:
-        safe = "".join(c if c.isalnum() else "_" for c in args.recipient)
-        out = args.out or f"{base}.{safe}.secure.zip"
+        default_out = os.path.join(out_dir, f"{code}-{rtag}.zip")
     else:
-        out = args.out or (base + ".secure.zip")
+        default_out = os.path.join(out_dir, f"{code}.zip")
+    out = args.out or default_out
     with pyzipper.AESZipFile(out, "w", compression=pyzipper.ZIP_DEFLATED,
                              encryption=pyzipper.WZ_AES) as z:
         z.setpassword(pwd.encode())

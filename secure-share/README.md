@@ -10,10 +10,10 @@ numérico invisible** + marca de agua.
 - **Código numérico invisible** asignado al título: se incrusta en los
   metadatos del documento y mediante esteganografía de caracteres de ancho
   cero. Permite identificar el origen de una fuga.
-- **Títulos ocultados como números**: los encabezados/títulos del documento se
-  redactan y se sustituyen por dígitos del mismo largo (deterministas), de modo
-  que el título no es legible en pantalla ni en una captura. Se desactiva con
-  `--no-hide-title`.
+- **Texto ocultado como números**: con `--hide` eliges qué redactar y sustituir
+  por dígitos del mismo largo (deterministas): `titles` (solo encabezados,
+  por defecto), `all` (TODO el texto del documento queda en números) o `none`.
+  Los bordes de las tablas se conservan.
 - **Marca de agua por destinatario**: con `-r "Nombre"` cada paquete lleva una
   marca de agua y una etiqueta numérica única, para trazar fugas por persona.
 - **Autodestrucción a los 75 s** (1:15): el visor se cierra solo y libera el
@@ -57,12 +57,18 @@ Empaquetar (lado emisor):
 python pack.py documento.pdf -o documento.secure.zip
 # La clave se pide de forma interactiva (no queda en el historial del shell).
 
+# El nombre de salida es NUMÉRICO por defecto (no revela el título):
+#   sin -o  ->  <codigo>.zip   (p. ej. 05920708060336676320.zip)
+
 # Un paquete por destinatario (marca de agua individual para trazar fugas):
 python pack.py documento.pdf -r "Juan Perez"
-# -> documento.Juan_Perez.secure.zip
+# -> <codigo>-<etiqueta>.zip   (todo numérico)
 
-# Si NO quieres ocultar los títulos como números:
-python pack.py documento.pdf --no-hide-title
+# Convertir TODO el texto del documento a números:
+python pack.py documento.pdf --hide all
+
+# No ocultar nada:
+python pack.py documento.pdf --hide none
 ```
 
 Abrir (lado receptor):
