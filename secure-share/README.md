@@ -10,6 +10,12 @@ numérico invisible** + marca de agua.
 - **Código numérico invisible** asignado al título: se incrusta en los
   metadatos del documento y mediante esteganografía de caracteres de ancho
   cero. Permite identificar el origen de una fuga.
+- **Títulos ocultados como números**: los encabezados/títulos del documento se
+  redactan y se sustituyen por dígitos del mismo largo (deterministas), de modo
+  que el título no es legible en pantalla ni en una captura. Se desactiva con
+  `--no-hide-title`.
+- **Marca de agua por destinatario**: con `-r "Nombre"` cada paquete lleva una
+  marca de agua y una etiqueta numérica única, para trazar fugas por persona.
 - **Autodestrucción a los 75 s** (1:15): el visor se cierra solo y libera el
   contenido de memoria. El contenido se descifra **solo en RAM**, nunca se
   escribe en disco.
@@ -50,6 +56,13 @@ Empaquetar (lado emisor):
 ```bash
 python pack.py documento.pdf -o documento.secure.zip
 # La clave se pide de forma interactiva (no queda en el historial del shell).
+
+# Un paquete por destinatario (marca de agua individual para trazar fugas):
+python pack.py documento.pdf -r "Juan Perez"
+# -> documento.Juan_Perez.secure.zip
+
+# Si NO quieres ocultar los títulos como números:
+python pack.py documento.pdf --no-hide-title
 ```
 
 Abrir (lado receptor):

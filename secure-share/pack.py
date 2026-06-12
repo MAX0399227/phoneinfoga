@@ -38,6 +38,7 @@ except ImportError as e:
 
 TTL_SECONDS = 75           # 1 min 15 s
 RENDER_DPI = 150
+HEAD_MIN_SIZE = 12.0       # spans de este tamaño o mayor = títulos/encabezados
 
 
 def numeric_code(data: bytes) -> str:
@@ -47,6 +48,57 @@ def numeric_code(data: bytes) -> str:
     return f"{n:020d}"
 
 
+def recipient_tag(name: str) -> str:
+    """Etiqueta numérica de 6 dígitos por destinatario (trazabilidad)."""
+    h = hashlib.sha256(name.encode()).hexdigest()
+    return f"{int(h, 16) % 1000000:06d}"
+
+
+def digitize(text: str, code: str) -> str:
+    """Convierte un texto en una cadena de dígitos del mismo largo (deterministico).
+
+    Conserva los espacios para que el bloque numérico ocupe el mismo lugar que
+    el título original. Reversible solo con el documento original (no es cifrado,
+    es ocultación visual)."""
+    h = hashlib.sha256((code + text).encode()).digest()
+    out, j = [], 0
+    for ch in text:
+        if ch.isspace():
+            out.append(ch)
+        else:
+            out.append(str(h[j % len(h)] % 10))
+            j += 1
+    return "".join(out)
+
+
+def hide_titles(doc, code):
+    """Redacta los títulos/encabezados y los sustituye por su versión numérica."""
+    n_hidden = 0
+    for page in doc:
+        spans = []
+        for b in page.get_text("dict")["blocks"]:
+            for l in b.get("lines", []):
+                for s in l["spans"]:
+                    if s["size"] >= HEAD_MIN_SIZE and s["text"].strip():
+                        spans.append((fitz.Rect(s["bbox"]), s["text"], s["size"]))
+        for rect, _txt, _sz in spans:
+            page.add_redact_annot(rect, fill=(1, 1, 1))  # blanquea el título
+        if spans:
+            page.apply_redactions()
+        for rect, txt, sz in spans:
+            digits = digitize(txt, code)
+            box = fitz.Rect(rect.x0, rect.y0 - 1, rect.x1, rect.y1 + sz * 0.5)
+            fs = sz
+            while fs > 4:
+                rc = page.insert_textbox(box, digits, fontsize=fs,
+                                         fontname="cour", color=(0, 0, 0))
+                if rc >= 0:
+                    break
+                fs -= 0.5
+            n_hidden += 1
+    return n_hidden
+
+
 def zero_width_stego(code: str) -> str:
     """Codifica el código numérico en caracteres de ancho cero (invisible)."""
     bits = "".join(f"{int(d):04b}" for d in code)
@@ -54,7 +106,7 @@ def zero_width_stego(code: str) -> str:
     return "".join("​" if b == "0" else "‌" for b in bits)
 
 
-def render_pages(doc, code):
+def render_pages(doc, code, wm_text):
     """Devuelve (imagen_normal_png, imagen_numerica_png) por página."""
     normals, numerics = [], []
     for page in doc:
@@ -69,7 +121,7 @@ def render_pages(doc, code):
             font = ImageFont.truetype("DejaVuSans.ttf", 22)
         except Exception:
             font = ImageFont.load_default()
-        txt = f"COD {code}  ·  CONFIDENCIAL"
+        txt = wm_text
         step = 260
         for y in range(0, wm.height + step, step):
             for x in range(-200, wm.width, step * 2):
@@ -108,6 +160,10 @@ def main():
     ap = argparse.ArgumentParser(description="Empaqueta PDF en ZIP cifrado autodestructible.")
     ap.add_argument("pdf", help="PDF de entrada")
     ap.add_argument("-o", "--out", help="ZIP de salida", default=None)
+    ap.add_argument("-r", "--recipient", default=None,
+                    help="Nombre/ID del destinatario (marca de agua individual)")
+    ap.add_argument("--no-hide-title", action="store_true",
+                    help="No ocultar los títulos como números")
     args = ap.parse_args()
 
     if not os.path.isfile(args.pdf):
@@ -131,20 +187,40 @@ def main():
     doc.set_metadata(meta)
 
     print(f"[*] Código numérico invisible del título: {code}")
+
+    if not args.no_hide_title:
+        n = hide_titles(doc, code)
+        print(f"[*] Títulos ocultados como números: {n}")
+
+    rtag = recipient_tag(args.recipient) if args.recipient else None
+    if args.recipient:
+        wm_text = f"COD {code}  ·  DEST {args.recipient} [{rtag}]  ·  NO REENVIAR"
+        print(f"[*] Destinatario: {args.recipient}  (etiqueta {rtag})")
+    else:
+        wm_text = f"COD {code}  ·  CONFIDENCIAL  ·  NO REENVIAR"
+
     print(f"[*] Renderizando {doc.page_count} páginas (DPI {RENDER_DPI})...")
-    normals, numerics = render_pages(doc, code)
+    normals, numerics = render_pages(doc, code, wm_text)
 
     manifest = {
         "docid": code,
         "title_invisible": code,
+        "recipient": args.recipient,
+        "recipient_tag": rtag,
+        "titles_hidden_as_numbers": not args.no_hide_title,
         "pages": doc.page_count,
         "ttl_seconds": TTL_SECONDS,
         "created": int(time.time()),
         "created_human": time.strftime("%Y-%m-%d %H:%M:%S"),
-        "note": "Autodestruccion a los 210s. No reenviar.",
+        "note": f"Autodestruccion a los {TTL_SECONDS}s. No reenviar.",
     }
 
-    out = args.out or (os.path.splitext(args.pdf)[0] + ".secure.zip")
+    base = os.path.splitext(args.pdf)[0]
+    if args.recipient:
+        safe = "".join(c if c.isalnum() else "_" for c in args.recipient)
+        out = args.out or f"{base}.{safe}.secure.zip"
+    else:
+        out = args.out or (base + ".secure.zip")
     with pyzipper.AESZipFile(out, "w", compression=pyzipper.ZIP_DEFLATED,
                              encryption=pyzipper.WZ_AES) as z:
         z.setpassword(pwd.encode())
