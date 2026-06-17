@@ -2,8 +2,9 @@
 
 Herramienta para **abrir un PDF**, agregarle la marca de agua **CVZ**, cifrarlo
 con una **clave** y restringir **copiar / imprimir / compartir**, además de un
-**visor web** que disuade las capturas de pantalla. La lectura **no tiene límite
-de tiempo**.
+**visor web** que disuade las capturas de pantalla. La lectura es de **un solo
+uso: se abre exactamente 1 minuto y luego el documento queda cerrado para
+siempre**.
 
 ## Contenido
 
@@ -53,7 +54,21 @@ El visor:
 - Bloquea **clic derecho, copiar, cortar, arrastrar, Ctrl+C/S/P/A/U**.
 - **Oscurece la pantalla** al cambiar de pestaña, minimizar, perder el foco o
   pulsar *Impr Pant* (disuasión de capturas y grabaciones).
-- **No impone límite de tiempo**: el documento permanece abierto mientras lo leas.
+- **Lectura única de 1 minuto**: al abrir, arranca una cuenta regresiva de
+  60 segundos visible en la barra. Al llegar a `00:00` el documento se cierra y
+  queda **cerrado para siempre**; no se puede reabrir aunque se recargue la
+  página (el estado de consumo se guarda en el navegador). Si se recarga
+  *durante* el minuto, el contador **se reanuda con el tiempo restante**, no se
+  reinicia.
+
+> Para cambiar el tiempo, edita `VIEW_SECONDS` en `viewer/viewer.js`
+> (por defecto `60`).
+>
+> El "cerrado para siempre" se aplica **por navegador** (usa `localStorage`).
+> Abrir el archivo en otro navegador o equipo, o borrar los datos del sitio,
+> iniciaría un nuevo minuto. Un bloqueo de un solo uso **real y global** exige
+> un servidor que registre el consumo y entregue el PDF una sola vez; dímelo si
+> quieres avanzar a esa versión.
 
 > El visor carga la librería PDF.js desde un CDN. Si necesitas que funcione sin
 > internet, descarga `pdf.min.mjs` y `pdf.worker.min.mjs` a `viewer/` y cambia

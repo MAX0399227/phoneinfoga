@@ -7,7 +7,8 @@
 //   - Se desactivan clic derecho, copiar, cortar, arrastrar e impresion.
 //   - La pantalla se oscurece al perder el foco o al pulsar Impr Pant.
 //   - Marca de agua "CVZ" superpuesta y repetida en cada pagina.
-//   - Sin temporizador: el documento permanece abierto sin limite de lectura.
+//   - Lectura de UN SOLO USO: se abre exactamente 1 minuto y luego el
+//     documento queda cerrado para siempre (no se puede reabrir).
 
 import * as pdfjsLib from "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.min.mjs";
 pdfjsLib.GlobalWorkerOptions.workerSrc =
@@ -17,13 +18,33 @@ const WATERMARK = "CVZ";
 // Ruta al PDF protegido (relativa al visor). Cambia si lo ubicas en otro sitio.
 const PDF_URL = "../MAMAESTAPRESA-protegido.pdf";
 
+// --- Autodestruccion: tiempo de lectura permitido (en segundos) ---
+const VIEW_SECONDS = 60;                 // exactamente 1 minuto
+const STORE_KEY = "cvz_doc_" + PDF_URL;  // marca de consumo por documento
+
 let pdfDoc = null;
+let countdownTimer = null;
 let scale = 1.3;
 
 const $ = (id) => document.getElementById(id);
 
+// ---------- Estado de consumo (un solo uso) ----------
+// Se guarda la fecha limite de la PRIMERA apertura. Tras esa fecha el
+// documento queda cerrado para siempre, aunque se recargue la pagina.
+function getDeadline() {
+  const raw = localStorage.getItem(STORE_KEY);
+  return raw ? parseInt(raw, 10) : null;
+}
+function isExpired() {
+  const d = getDeadline();
+  return d !== null && Date.now() >= d;
+}
+
 // ---------- Apertura con clave ----------
 async function open() {
+  // Si ya se agoto el minuto en una apertura previa -> cerrado para siempre.
+  if (isExpired()) { permanentlyClosed(); return; }
+
   const pass = $("pwd").value;
   $("err").textContent = "";
   try {
@@ -38,9 +59,53 @@ async function open() {
     }
     return;
   }
+
+  // Fija la fecha limite en la PRIMERA apertura valida. Si se recarga durante
+  // el minuto, se reanuda con el tiempo restante (no se reinicia el contador).
+  let deadline = getDeadline();
+  if (deadline === null) {
+    deadline = Date.now() + VIEW_SECONDS * 1000;
+    localStorage.setItem(STORE_KEY, String(deadline));
+  }
+
   $("gate").style.display = "none";
   $("toolbar").style.display = "flex";
   await render();
+  startCountdown(deadline);
+}
+
+// ---------- Cuenta regresiva y cierre definitivo ----------
+function startCountdown(deadline) {
+  const tick = () => {
+    const remaining = Math.max(0, Math.ceil((deadline - Date.now()) / 1000));
+    const m = String(Math.floor(remaining / 60)).padStart(2, "0");
+    const s = String(remaining % 60).padStart(2, "0");
+    $("timer").textContent = `${m}:${s}`;
+    $("timer").style.color = remaining <= 10 ? "#ff6b6b" : "#ffd166";
+    if (remaining <= 0) {
+      clearInterval(countdownTimer);
+      permanentlyClosed();
+    }
+  };
+  tick();
+  clearInterval(countdownTimer);
+  countdownTimer = setInterval(tick, 250);
+}
+
+// Cierra el documento de forma irreversible: borra el render y bloquea reapertura.
+function permanentlyClosed() {
+  clearInterval(countdownTimer);
+  pdfDoc = null;
+  // Asegura que la marca de consumo quede como expirada.
+  localStorage.setItem(STORE_KEY, String(Date.now() - 1));
+  $("stage").innerHTML = "";
+  $("toolbar").style.display = "none";
+  $("gate").style.display = "flex";
+  $("gate").querySelector(".card").innerHTML =
+    '<h1>Documento cerrado</h1>' +
+    '<p style="margin-top:10px;line-height:1.5">El tiempo de lectura de 1 minuto ' +
+    'finalizó.<br>Este documento quedó <strong>cerrado para siempre</strong> ' +
+    'y no puede volver a abrirse.</p>';
 }
 
 // ---------- Render de todas las paginas ----------
@@ -130,3 +195,6 @@ $("pwd").addEventListener("keydown", (e) => { if (e.key === "Enter") open(); });
 hardenCopyProtection();
 hardenScreenProtection();
 bindToolbar();
+
+// Si el documento ya fue leido y expiro su minuto, mostrar cerrado de inmediato.
+if (isExpired()) permanentlyClosed();

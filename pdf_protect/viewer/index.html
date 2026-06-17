@@ -68,7 +68,7 @@
   <div id="gate">
     <div class="card">
       <h1>Documento protegido</h1>
-      <p>Lectura sin límite de tiempo · Marca de agua CVZ</p>
+      <p>Lectura única de 1 minuto · Marca de agua CVZ</p>
       <input id="pwd" type="password" placeholder="Clave del archivo" autofocus />
       <button id="open">Abrir</button>
       <div class="err" id="err"></div>
@@ -83,6 +83,8 @@
     <strong>CVZ</strong>
     <span style="color:#9aa0aa">Documento protegido — copia/captura deshabilitadas</span>
     <span class="spacer"></span>
+    <span style="color:#9aa0aa">Cierra en</span>
+    <strong id="timer" style="font-variant-numeric:tabular-nums; color:#ffd166; min-width:46px; text-align:center">01:00</strong>
     <button id="zoomOut">A−</button>
     <button id="zoomIn">A+</button>
   </div>
